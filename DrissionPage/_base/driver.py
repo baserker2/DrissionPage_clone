@@ -36,7 +36,8 @@ class Driver(object):
         self._websocket_url = f'ws://{address}/devtools/{tab_type}/{tab_id}'
         self._cur_id = 0
         self._ws = None
-
+        
+        #线程与异步
         self._recv_th = Thread(target=self._recv_loop)
         self._handle_event_th = Thread(target=self._handle_event_loop)
         self._recv_th.daemon = True
