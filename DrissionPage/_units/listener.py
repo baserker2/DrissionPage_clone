@@ -196,7 +196,7 @@ class Listener(object):
         if self.listening:
             self._driver.set_callback('Network.requestWillBeSent', None)
             self._driver.set_callback('Network.responseReceived', None)
-            self._driver.set_callback('Network.loadingFinished', None)
+            self._driver.set_callback('Network.loadingFinished', None) 
             self._driver.set_callback('Network.loadingFailed', None)
             self.listening = False
         if clear:
@@ -267,7 +267,8 @@ class Listener(object):
         self._driver.set_callback('Network.requestWillBeSentExtraInfo', self._requestWillBeSentExtraInfo)
         self._driver.set_callback('Network.responseReceived', self._response_received)
         self._driver.set_callback('Network.responseReceivedExtraInfo', self._responseReceivedExtraInfo)
-        self._driver.set_callback('Network.loadingFinished', self._loading_finished)
+        # self._driver.set_callback('Network.loadingFinished', None) # 此方法不稳定，手动fetch的包有时没有Network.loadingFinished事件
+        self._driver.set_callback('Network.dataReceived', None) # 改用这个事件，反正最终目的是获取rid，不影响其他逻辑
         self._driver.set_callback('Network.loadingFailed', self._loading_failed)
 
     def _requestWillBeSent(self, **kwargs):
@@ -326,16 +327,25 @@ class Listener(object):
             else:
                 r['response'] = kwargs
 
-    def _loading_finished(self, **kwargs):
+def _loading_finished(self, **kwargs):
         """请求完成时处理方法"""
         self._running_requests -= 1
         rid = kwargs['requestId']
-        packet = self._request_ids.get(rid)
+        packet = self._request_ids.get(rid) # 实际上就是rid
         if packet:
+            
             r = self._driver.run('Network.getResponseBody', requestId=rid)
+            if 'error' in r:
+                r = self._driver.run('Network.streamResourceContent', requestId=rid)
             if 'body' in r:
+                print('case1')
                 packet._raw_body = r['body']
-                packet._base64_body = r['base64Encoded']
+                packet._base64_body = r['base64Encoded'] # T or F
+            elif 'bufferedData' in r:
+                print('buffer')
+                buffer = r['bufferedData']
+                packet._raw_body = str(base64.b64decode(buffer), "utf-8")
+                packet._base64_body = False
             else:
                 packet._raw_body = ''
                 packet._base64_body = False
